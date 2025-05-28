@@ -17,7 +17,7 @@ public class Manganato : MangaConnector
     {
         Log($"Searching Publications. Term=\"{publicationTitle}\"");
         string sanitizedTitle = string.Join('_', Regex.Matches(publicationTitle, "[A-z]*").Where(str => str.Length > 0)).ToLower();
-        string requestUrl = $"https://manganato.gg/search/story/{sanitizedTitle}";
+        string requestUrl = $"https://natomanga.com/search/story/{sanitizedTitle}";
         RequestResult requestResult =
             downloadClient.MakeRequest(requestUrl, RequestType.Default);
         if ((int)requestResult.statusCode < 200 || (int)requestResult.statusCode >= 300)

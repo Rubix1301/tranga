@@ -1,7 +1,7 @@
 ﻿version: '3'
 services:
   tranga-api:
-    image: glax/tranga-api:latest
+    image: Rubix1301/tranga:latest
     container_name: tranga-api
     volumes:
       - ./Manga:/Manga
