@@ -15,18 +15,28 @@ internal class HttpDownloadClient : DownloadClient
     {
         Client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", TrangaSettings.userAgent);
     }
-    
+
     internal override RequestResult MakeRequestInternal(string url, string? referrer = null, string? clickButton = null)
     {
-        if(clickButton is not null)
-            Log("Can not click button on static site.");
+        if (clickButton is not null)
+            Log("Cannot click button on static site.");
+
         HttpResponseMessage? response = null;
+
         while (response is null)
         {
             HttpRequestMessage requestMessage = new(HttpMethod.Get, url);
-            if (referrer is not null)
+
+            requestMessage.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36");
+            requestMessage.Headers.Accept.ParseAdd("text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
+            requestMessage.Headers.AcceptLanguage.ParseAdd("en-US,en;q=0.5");
+            requestMessage.Headers.Referrer = new Uri("https://natomanga.com/");
+            requestMessage.Headers.Connection.ParseAdd("keep-alive");
+            requestMessage.Headers.Add("Upgrade-Insecure-Requests", "1");
+
+            if (referrer != null)
                 requestMessage.Headers.Referrer = new Uri(referrer);
-            //Log($"Requesting {requestType} {url}");
+
             try
             {
                 response = Client.Send(requestMessage);
@@ -36,10 +46,10 @@ internal class HttpDownloadClient : DownloadClient
                 switch (e)
                 {
                     case TaskCanceledException:
-                        Log($"Request timed out {url}.\n\r{e}");
+                        Log($"Request timed out {url}.\n{e}");
                         return new RequestResult(HttpStatusCode.RequestTimeout, null, Stream.Null);
                     case HttpRequestException:
-                        Log($"Request failed {url}\n\r{e}");
+                        Log($"Request failed {url}\n{e}");
                         return new RequestResult(HttpStatusCode.BadRequest, null, Stream.Null);
                 }
             }
@@ -48,28 +58,23 @@ internal class HttpDownloadClient : DownloadClient
         if (!response.IsSuccessStatusCode)
         {
             Log($"Request-Error {response.StatusCode}: {url}");
-            return new RequestResult(response.StatusCode,  null, Stream.Null);
+            return new RequestResult(response.StatusCode, null, Stream.Null);
         }
-        
-        Stream stream = response.Content.ReadAsStream();
+
+        // Read the full content as string (works for any content-type)
+        string contentString = response.Content.ReadAsStringAsync().Result;
 
         HtmlDocument? document = null;
-
-        if (response.Content.Headers.ContentType?.MediaType == "text/html")
+        if (response.Content.Headers.ContentType?.MediaType?.Contains("html") == true)
         {
-            StreamReader reader = new (stream);
-            document = new ();
-            document.LoadHtml(reader.ReadToEnd());
-            stream.Position = 0;
+            document = new HtmlDocument();
+            document.LoadHtml(contentString);
         }
 
-        // Request has been redirected to another page. For example, it redirects directly to the results when there is only 1 result
-        if (response.RequestMessage is not null && response.RequestMessage.RequestUri is not null)
-        {
-            return new RequestResult(response.StatusCode, document, stream, true,
-                response.RequestMessage.RequestUri.AbsoluteUri);
-        }
+        // Create a seekable stream for downstream consumption
+        Stream stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(contentString));
 
-        return new RequestResult(response.StatusCode, document, stream);
+        return new RequestResult(response.StatusCode, document, stream, true,
+            response.RequestMessage?.RequestUri?.AbsoluteUri);
     }
 }

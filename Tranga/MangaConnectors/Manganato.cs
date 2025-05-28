@@ -18,10 +18,18 @@ public class Manganato : MangaConnector
         Log($"Searching Publications. Term=\"{publicationTitle}\"");
         string sanitizedTitle = string.Join('_', Regex.Matches(publicationTitle, "[A-z]*").Where(str => str.Length > 0)).ToLower();
         string requestUrl = $"https://natomanga.com/search/story/{sanitizedTitle}";
+        Log($"Built search URL: {requestUrl}");
         RequestResult requestResult =
             downloadClient.MakeRequest(requestUrl, RequestType.Default);
+            Log($"Got response: {(int)requestResult.statusCode} {requestResult.statusCode}");
         if ((int)requestResult.statusCode < 200 || (int)requestResult.statusCode >= 300)
             return Array.Empty<Manga>();
+
+        if (requestResult.htmlDocument is null)
+        {
+            Log("HTML document is null.");
+            return Array.Empty<Manga>();
+        }
 
         if (requestResult.htmlDocument is null)
             return Array.Empty<Manga>();
